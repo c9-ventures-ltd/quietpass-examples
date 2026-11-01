@@ -1,0 +1,450 @@
+{
+  "name": "QuietPass — check one contact",
+  "active": false,
+  "nodes": [
+    {
+      "id": "start-here",
+      "name": "Start here",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        260
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "contact-and-limits",
+      "name": "Contact and limits",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        260
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"phone\": \"\",\n  \"defaultCountry\": \"\",\n  \"checks\": [\n    \"basic_line_type\",\n    \"enhanced_line_type\",\n    \"current_carrier\",\n    \"mnp\",\n    \"live_status\",\n    \"sms\",\n    \"whatsapp\",\n    \"telegram\"\n  ],\n  \"currency\": \"GBP\",\n  \"maxSpendMicros\": 50000,\n  \"executePaid\": false,\n  \"operationKey\": \"REPLACE_WITH_STABLE_EVENT_ID\",\n  \"recoveryQuoteId\": \"\"\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "validate-input",
+      "name": "Validate input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        260
+      ],
+      "parameters": {
+        "jsCode": "return (function validateInput() {\n  const rows = $input.all();\n  if (rows.length !== 1) throw Error('Use one contact per operation. Add a loop before this workflow for a contact list.');\n  const c = rows[0].json;\n  if (!['GBP','USD','EUR'].includes(c.currency) || !Number.isSafeInteger(c.maxSpendMicros) || c.maxSpendMicros < 0 || c.maxSpendMicros > 100000000000 || typeof c.executePaid !== 'boolean') throw Error('Choose currency, an integer spending ceiling, and executePaid true or false.');\n  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(c.operationKey || '') || c.operationKey === 'REPLACE_WITH_STABLE_EVENT_ID') throw Error('Set operationKey to a stable unique contact-event ID. Reuse it when retrying; never generate it from the execution ID.');\n  const recovering = !!c.recoveryQuoteId;\n  if (recovering && !/^[a-f0-9-]{36}$/i.test(c.recoveryQuoteId)) throw Error('Use the original quote ID for recovery.');\n  if (!recovering && (typeof c.phone !== 'string' || !c.phone.trim())) throw Error('Enter a phone number you are authorized to query.');\n  const allowed = ['basic_line_type','enhanced_line_type','current_carrier','mnp','live_status','sms','whatsapp','telegram'];\n  if (!Array.isArray(c.checks) || new Set(c.checks).size !== c.checks.length || c.checks.some(v => !allowed.includes(v))) throw Error('Select supported checks without duplicates.');\n  return [{json:{config:c,recovering,input:{phone:c.phone,...(c.defaultCountry ? {default_country:c.defaultCountry} : {}),checks:c.checks}}}];\n})();"
+      }
+    },
+    {
+      "id": "recover-original-request",
+      "name": "Recover original request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        260
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "gate",
+              "leftValue": "={{ $json.recovering }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "read-original-result",
+      "name": "Read original result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        40
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://quietpass.com/v1/phone/results/' + $json.config.recoveryQuoteId + '?include_details=true' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "timeout": 30000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "recovery-status",
+      "name": "Recovery status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        40
+      ],
+      "parameters": {
+        "jsCode": "return (function recoveryResult() {\n  const response = $input.first().json, c = $('Validate input').first().json.config;\n  if (response.statusCode !== 200 || !['not_started','pending','settled','expired'].includes(response.body?.state)) throw Error('Status unavailable. Retain the original quote and operationKey; no replacement lookup was run.');\n  return [{json:{...response.body,operation:{quoteId:c.recoveryQuoteId,idempotencyKey:c.operationKey},instruction:'Recovery never submits execution. Pending: check later. Not started: submit the original quote, maximum and key using the API or Postman. Expired: retained result is unavailable.'}}];\n})();"
+      }
+    },
+    {
+      "id": "get-quote",
+      "name": "Get quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://quietpass.com/v1/phone/quote",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.input) }}",
+        "options": {
+          "timeout": 30000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "validate-quote",
+      "name": "Validate quote",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        400
+      ],
+      "parameters": {
+        "jsCode": "return (function validateQuote() {\n  const c = $('Validate input').first().json.config;\n  const response = $input.first().json, q = response.body?.quote;\n  if (response.statusCode !== 200) throw Error((response.body?.error?.code || 'QUOTE_FAILED') + ' — request ' + (response.body?.error?.requestId || 'unknown'));\n  if (!q || !/^[a-f0-9-]{36}$/i.test(q.id) || q.currency !== c.currency || !Number.isSafeInteger(q.maxMicros) || q.maxMicros < 0 || q.maxMicros > c.maxSpendMicros || !Number.isFinite(Date.parse(q.expiresAt)) || Date.parse(q.expiresAt) <= Date.now()) throw Error('Quoted currency, maximum, or expiry needs review. Nothing executed.');\n  return [{json:{config:c,quote:q,unavailableChecks:response.body.unavailableChecks,operation:{quoteId:q.id,idempotencyKey:c.operationKey,maxSpendMicros:q.maxMicros,currency:q.currency}}}];\n})();"
+      }
+    },
+    {
+      "id": "live-execution-enabled",
+      "name": "Live execution enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1340,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "gate",
+              "leftValue": "={{ $json.config.executePaid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "execute-original-quote",
+      "name": "Execute original quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://quietpass.com/v1/phone/execute?include_details=true",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({quoteId:$json.operation.quoteId,maxSpendMicros:$json.operation.maxSpendMicros}) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.operation.idempotencyKey }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "execution-result",
+      "name": "Execution result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return (function executionResult() {\n  const response = $input.first().json, operation = $('Validate quote').first().json.operation;\n  if (response.statusCode !== 200 || !response.body?.number) throw Error((response.body?.error?.code || 'EXECUTION_UNRESOLVED') + ' — retain quoteId=' + operation.quoteId + ', idempotencyKey=' + operation.idempotencyKey + ', maxSpendMicros=' + operation.maxSpendMicros + '. Set recoveryQuoteId to this quote and run read-only recovery. Do not create a replacement request.');\n  return [{json:{state:'settled',operation,result:response.body}}];\n})();"
+      }
+    },
+    {
+      "id": "quote-only",
+      "name": "Quote only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        540
+      ],
+      "parameters": {
+        "jsCode": "return (function quotePreview() {\n  const r = $input.first().json;\n  return [{json:{state:'quote_only',quote:r.quote,unavailableChecks:r.unavailableChecks,operation:r.operation,instruction:'No credit used. Review price and availability. Set executePaid=true to run a lookup. Keep the same operationKey for the same contact event.'}}];\n})();"
+      }
+    },
+    {
+      "id": "contact-fields",
+      "name": "Contact fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        180
+      ],
+      "parameters": {
+        "jsCode": "return (function contactFields() {\n  const r = $input.first().json;\n  if (r.state !== 'settled' || !r.result) return [{json:r}];\n  const result = r.result;\n  const tri = value => typeof value === 'boolean' ? value : null;\n  return [{json:{...r,contactUpdate:{\n    phone:result.number.e164,number_type:result.number.type ?? null,carrier:result.number.carrier ?? null,\n    ported:tri(result.number.ported),sms_supported:tri(result.contact?.sms?.supported),sms_assumed:result.contact?.sms?.assumed ?? false,\n    whatsapp_registered:tri(result.contact?.whatsapp?.registered),telegram_registered:tri(result.contact?.telegram?.registered),network_reachable:tri(result.network?.reachable),\n    sms_reason:result.contact?.sms?.reason ?? null,whatsapp_reason:result.contact?.whatsapp?.reason ?? null,telegram_reason:result.contact?.telegram?.reason ?? null,network_reason:result.network?.reason ?? null,\n    request_id:result.requestId,currency:result.billing?.currency ?? null,charged_micros:result.billing?.chargedMicros ?? null,\n  }}}];\n})();"
+      }
+    },
+    {
+      "id": "setup-instructions",
+      "name": "Setup instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -170
+      ],
+      "parameters": {
+        "height": 300,
+        "width": 700,
+        "content": "## QuietPass: one contact per event\n1. Set phone, checks, currency and cap in Contact and limits. Use defaultCountry only for national input.\n2. Choose the same Bearer Auth credential (your QuietPass server key) on all three HTTP nodes. Never paste it into the JSON.\n3. Set operationKey to a stable contact-event ID; reuse it on retry.\n4. Run quote-only first. Enable executePaid only after reviewing price/coverage.\n5. After a timeout, copy quoteId from Validate quote into recoveryQuoteId. This branch only reads status. Keep the original key and maximum.\n6. Connect Contact fields to your own CRM/spreadsheet update. Only map settled results; preserve null and false.\nhttps://quietpass.com/docs/#integration-kit"
+      }
+    }
+  ],
+  "connections": {
+    "Start here": {
+      "main": [
+        [
+          {
+            "node": "Contact and limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact and limits": {
+      "main": [
+        [
+          {
+            "node": "Validate input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate input": {
+      "main": [
+        [
+          {
+            "node": "Recover original request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover original request": {
+      "main": [
+        [
+          {
+            "node": "Read original result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read original result": {
+      "main": [
+        [
+          {
+            "node": "Recovery status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recovery status": {
+      "main": [
+        [
+          {
+            "node": "Contact fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get quote": {
+      "main": [
+        [
+          {
+            "node": "Validate quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate quote": {
+      "main": [
+        [
+          {
+            "node": "Live execution enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Live execution enabled": {
+      "main": [
+        [
+          {
+            "node": "Execute original quote",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Quote only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute original quote": {
+      "main": [
+        [
+          {
+            "node": "Execution result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execution result": {
+      "main": [
+        [
+          {
+            "node": "Contact fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "tags": []
+}
