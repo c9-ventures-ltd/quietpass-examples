@@ -1,53 +1,87 @@
 # QuietPass API examples
 
-Phone intelligence for CRM, product, and automation workflows. Start with free number formatting, then choose carrier information, available network status, or reported WhatsApp and Telegram registration.
+Send a phone number and choose the information you need: free number details, current network and live status, or linked messaging accounts. Use the answers in your forms, CRM, or automation workflows.
 
-[Developer quickstart](https://quietpass.com/docs/) · [Integrations and workflows](https://quietpass.com/integrations/) · [Pricing](https://quietpass.com/pricing/) · [Coverage](https://quietpass.com/coverage/)
+[API quickstart](https://quietpass.com/docs/) · [API reference](https://quietpass.com/docs/api/) · [Integrations](https://quietpass.com/integrations/) · [Pricing](https://quietpass.com/pricing/) · [Coverage](https://quietpass.com/coverage/)
 
-These are the same starter files published on quietpass.com. They contain no API keys or customer data. JavaScript and Python start in quote-only mode. The Postman collection requires explicit live-execution permission, and the n8n HTTP starter imports inactive.
+## Choose a starter
 
-| Starter | Requirements | File |
+| Tool | What you need | Download |
 | --- | --- | --- |
-| JavaScript | Node.js 20+, no packages | [quietpass.mjs](javascript/quietpass.mjs) |
-| Python | Python 3.10+, standard library | [quietpass.py](python/quietpass.py) |
-| Postman | Postman with Vault support | [Collection](postman/quietpass.postman_collection.json) |
-| n8n HTTP workflow | Compatible n8n instance | [Inactive workflow](n8n/quietpass.n8n.json) |
+| JavaScript | Node.js 20+; no packages | [JavaScript starter](javascript/quietpass.mjs) |
+| Python | Python 3.10+; standard library | [Python starter](python/quietpass.py) |
+| Postman | Postman with Vault support | [Postman collection](postman/quietpass.postman_collection.json) |
+| n8n | An n8n instance | [API workflow](n8n/quietpass.n8n.json) |
 
-## First request
+JavaScript, Python, and Postman use the same [request JSON](request.json). The n8n workflow has equivalent fields in **Contact and limits** and imports inactive with paid checks off.
 
-Create a [QuietPass account](https://quietpass.com/signup.html), complete account setup, activate credit, and create a server API key. Set `QUIETPASS_API_KEY` through your secret manager; never commit or paste it into a workflow or public issue.
+## Make your first lookup
 
-```sh
-export QUIETPASS_PHONE="YOUR_AUTHORIZED_PHONE_NUMBER"
-export QUIETPASS_CURRENCY="GBP"
-export QUIETPASS_MAX_MICROS="50000"
-# For national input, also set QUIETPASS_COUNTRY, for example GB.
-node javascript/quietpass.mjs --free
-# Or:
-python3 python/quietpass.py --free
+Create a [QuietPass account](https://quietpass.com/signup.html) and an API key. Set `QUIETPASS_API_KEY` in your server environment.
+
+In [request.json](request.json), set `phone` to the number you want to check. Use `defaultCountry` for a local number; international numbers beginning with `+` or `00` do not need it. For example, `07400 123456` with `defaultCountry: "GB"` is accepted.
+
+The supplied request selects free number details:
+
+```json
+{
+  "phone": "",
+  "defaultCountry": "GB",
+  "checks": ["basic_line_type"],
+  "currency": "GBP",
+  "maxSpend": "0.00"
+}
 ```
 
-International `+` and `00` input needs no default country. A free formatting result does not prove that a number is assigned, reachable, or owned by someone.
+Run either starter from this repository's root:
 
-## Review before paid use
+```sh
+node javascript/quietpass.mjs request.json
+```
 
-Run the script without `--free` to prepare a quote. Review the selected checks, price, and currency, then use `--execute` to submit the saved operation within the chosen maximum. `50000` is 0.05 in the workspace currency; each workspace has one fixed currency. See the [full setup instructions](https://quietpass.com/docs/#integration-kit).
+```sh
+python3 python/quietpass.py request.json
+```
 
-The scripts save references in `quietpass-operation.json`. Preserve that file after a timeout or failure. Read the original status before starting another operation; retrying a CRM write does not require purchasing another lookup. Results are retained for 24 hours. Protect terminal output and execution history.
+For Postman, import the collection, add your key to Vault as `quietpass-api-key`, set the collection's `request` variable to your request JSON, and send **Run lookup**.
+
+## Add the checks you need
+
+Select individual checks within either paid package, or combine both in the same request.
+
+| Package | Check names | Price per number, per lookup |
+| --- | --- | --- |
+| Basic details | `basic_line_type` | Free |
+| Phone services | `enhanced_line_type`, `current_carrier`, `mnp`, `live_status`, `sms` | 0.02 |
+| Messaging apps | `whatsapp`, `telegram` | 0.03 |
+
+Prices above are in your workspace currency: GBP, USD, or EUR. Each selected paid package is charged once when at least one requested check gives a definite answer, including a negative. A package with only unavailable or inconclusive answers costs zero. [Billing details](https://quietpass.com/pricing/#charging).
+
+For example, change `checks` to `["current_carrier", "whatsapp"]` and `maxSpend` to `"0.05"` to allow both packages. Use your workspace's currency in `currency`. The lookup returns the actual charge in `billing.amount` and `billing.currency`.
+
+**Quotes are optional.** To review a quote first, run either starter with `request.json --quote`. Run it again without `--quote` to execute that saved quote. In Postman, open **Optional quote-based examples**.
+
+## Read a result again
+
+The scripts save a reference beside the request file as `request.json.quietpass-operation.json`. Rerun the same command to read the original lookup before submitting anything again. To deliberately check again after the original lookup has settled or expired, add `--new-lookup`.
+
+In Postman, use **Read original result**. To deliberately start another lookup after settlement or expiry, set `start_new_lookup` to `true` before sending **Run lookup**.
+
+Saved results are available for 24 hours. Keep the original request and operation reference after a timeout; a missing response does not establish whether the lookup ran.
 
 ## Connect a platform
 
-- [HubSpot direct connection](https://quietpass.com/integrations/hubspot/)
+- [HubSpot setup](https://quietpass.com/integrations/hubspot/)
 - [n8n verified node and HubSpot workflows](https://quietpass.com/integrations/n8n/)
-- [Make app invitation and CRM/Sheets blueprints](https://quietpass.com/integrations/make/)
-- [Zapier installation invitation](https://quietpass.com/integrations/zapier/)
-- [Clay HTTP recipe](https://quietpass.com/integrations/clay/)
-- [HighLevel workflow recipes](https://quietpass.com/integrations/highlevel/)
+- [Make setup and workflow downloads](https://quietpass.com/integrations/make/)
+- [Zapier setup](https://quietpass.com/integrations/zapier/)
+- [Clay setup](https://quietpass.com/integrations/clay/)
+- [HighLevel setup](https://quietpass.com/integrations/highlevel/)
 
-The HTTP starter here is separate from the [verified QuietPass n8n node](https://github.com/c9-ventures-ltd/n8n-nodes-quietpass). Invitation apps and manual recipes are described accurately in their guides; these links do not imply Marketplace approval.
+The n8n HTTP starter in this repository uses built-in nodes. The HubSpot workflows use the separate [verified QuietPass node](https://github.com/c9-ventures-ltd/n8n-nodes-quietpass).
 
-## Support and maintenance
+## Help
 
-Use [hello@quietpass.com](mailto:hello@quietpass.com) for support. Include a request reference and the error code, never API keys, customer numbers, or complete results. Downloadable starters are learning examples; use durable application storage for production queues.
+[Contact QuietPass](https://quietpass.com/contact/) with the request reference and error code if you need help. Keep API keys and customer data out of public issues and shared exports.
 
-The source and release checks are maintained in QuietPass's application repository. This repository mirrors the published starter files. No supplier call is made merely by cloning or importing them. These examples are provided for copying and adaptation in integrations with the QuietPass API; service use remains subject to the [service terms](https://quietpass.com/terms/).
+These files match the starters published on quietpass.com. [Service terms](https://quietpass.com/terms/) apply to use of the API.

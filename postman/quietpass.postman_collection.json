@@ -2,7 +2,7 @@
   "info": {
     "name": "QuietPass — first lookup",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Server API starter. Save your key in Postman Vault as quietpass-api-key. Set phone, currency, and max_micros locally. Live execution is OFF by default. Quote first, inspect the price and unavailable checks, then explicitly enable the execute request. Keep the saved quote/key after a timeout; read the original result before retrying. Do not share exports containing real phone numbers or results. Instructions: https://quietpass.com/docs/#integration-kit"
+    "description": "Set request to the same JSON object used by the API and JavaScript/Python starter files. Add your API key to Postman Vault as quietpass-api-key. Run lookup handles free and paid checks; quoting is optional. Read original result recovers the same Idempotency-Key without a new charge. The initial request is free-only and has no phone number. Do not share exports containing populated requests, keys, or results. Instructions: https://quietpass.com/docs/#integration-kit"
   },
   "auth": {
     "type": "bearer",
@@ -19,28 +19,23 @@
   },
   "variable": [
     {
-      "key": "phone",
+      "key": "request",
+      "value": "{\n  \"phone\": \"\",\n  \"defaultCountry\": \"GB\",\n  \"checks\": [\n    \"basic_line_type\"\n  ],\n  \"currency\": \"GBP\",\n  \"maxSpend\": \"0.00\"\n}",
+      "type": "string"
+    },
+    {
+      "key": "qp_direct_key",
       "value": "",
       "type": "string"
     },
     {
-      "key": "default_country",
+      "key": "qp_direct_input",
       "value": "",
       "type": "string"
     },
     {
-      "key": "checks",
-      "value": "[\"basic_line_type\",\"enhanced_line_type\",\"current_carrier\",\"mnp\",\"live_status\",\"sms\",\"whatsapp\",\"telegram\"]",
-      "type": "string"
-    },
-    {
-      "key": "currency",
-      "value": "GBP",
-      "type": "string"
-    },
-    {
-      "key": "max_micros",
-      "value": "50000",
+      "key": "qp_direct_state",
+      "value": "",
       "type": "string"
     },
     {
@@ -81,133 +76,7 @@
   ],
   "item": [
     {
-      "name": "1. Global coverage (public)",
-      "request": {
-        "method": "GET",
-        "auth": {
-          "type": "noauth"
-        },
-        "header": [],
-        "url": "https://quietpass.com/v1/coverage",
-        "description": ""
-      },
-      "event": []
-    },
-    {
-      "name": "2. Wallet (read only)",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "https://quietpass.com/v1/wallet",
-        "description": ""
-      },
-      "event": []
-    },
-    {
-      "name": "3. Free number formatting",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": "https://quietpass.com/v1/phone/check?include_details=true",
-        "body": {
-          "mode": "raw",
-          "raw": "{{qp_free_input}}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "description": ""
-      },
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
-              "const phone = pm.variables.get('phone');",
-              "if (!phone || !String(phone).trim()) stop('Set phone to a number you are authorized to query.');",
-              "const country = pm.variables.get('default_country');",
-              "const body = {phone, checks: JSON.parse(pm.variables.get('checks'))};",
-              "if (country) body.default_country = country;",
-              "pm.variables.set('qp_input', JSON.stringify(body));",
-              "body.checks=['basic_line_type']; pm.variables.set('qp_free_input',JSON.stringify(body));"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "4. Quote selected checks (no charge)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": "https://quietpass.com/v1/phone/quote",
-        "body": {
-          "mode": "raw",
-          "raw": "{{qp_input}}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "description": "Review quote.maxMicros, currency, and unavailableChecks. 50000 micros = 0.05 of that currency."
-      },
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
-              "if (pm.collectionVariables.get('qp_quote_id')) {",
-              "  if (pm.collectionVariables.get('start_new_lookup') !== 'true' || !['settled','expired'].includes(pm.collectionVariables.get('qp_state'))) stop('Read the original result. Only a settled or expired operation can be replaced with start_new_lookup=true.');",
-              "  for (const key of ['qp_quote_id','qp_operation_key','qp_max_micros','qp_currency','qp_state']) pm.collectionVariables.unset(key);",
-              "  pm.collectionVariables.set('start_new_lookup','false');",
-              "}",
-              "const phone = pm.variables.get('phone');",
-              "if (!phone || !String(phone).trim()) stop('Set phone to a number you are authorized to query.');",
-              "const country = pm.variables.get('default_country');",
-              "const body = {phone, checks: JSON.parse(pm.variables.get('checks'))};",
-              "if (country) body.default_country = country;",
-              "pm.variables.set('qp_input', JSON.stringify(body));"
-            ]
-          }
-        },
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "if (pm.response.code !== 200) throw Error(pm.response.json().error?.code || 'Quote failed');",
-              "const q = pm.response.json().quote, limit = Number(pm.variables.get('max_micros'));",
-              "if (!q || !/^[a-f0-9-]{36}$/i.test(q.id) || !Number.isSafeInteger(limit) || limit < 0 || !Number.isSafeInteger(q.maxMicros) || q.maxMicros < 0 || q.maxMicros > limit || q.currency !== pm.variables.get('currency') || !Number.isFinite(Date.parse(q.expiresAt)) || Date.parse(q.expiresAt) <= Date.now()) throw Error('Review the quoted currency, price, or expiry. No execution enabled.');",
-              "pm.collectionVariables.set('qp_quote_id',q.id);",
-              "pm.collectionVariables.set('qp_operation_key',pm.variables.replaceIn('{{$guid}}'));",
-              "pm.collectionVariables.set('qp_max_micros',String(q.maxMicros));",
-              "pm.collectionVariables.set('qp_currency',q.currency);",
-              "pm.collectionVariables.set('qp_state','not_started');",
-              "pm.collectionVariables.set('allow_live_execution','false');"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "5. Execute original quote (explicit opt-in)",
+      "name": "Run lookup",
       "request": {
         "method": "POST",
         "header": [
@@ -217,20 +86,20 @@
           },
           {
             "key": "Idempotency-Key",
-            "value": "{{qp_execute_key}}"
+            "value": "{{qp_direct_key}}"
           }
         ],
-        "url": "https://quietpass.com/v1/phone/execute?include_details=true",
+        "url": "https://quietpass.com/v1/phone/lookup?includeDetails=true",
         "body": {
           "mode": "raw",
-          "raw": "{{qp_execute_input}}",
+          "raw": "{{qp_direct_body}}",
           "options": {
             "raw": {
               "language": "json"
             }
           }
         },
-        "description": "Use the same quote, maximum, and key for recovery. No automatic retries."
+        "description": "Uses the common request object. Selected checks determine free or paid usage. The result includes the actual billed amount."
       },
       "event": [
         {
@@ -239,13 +108,21 @@
             "type": "text/javascript",
             "exec": [
               "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
-              "if (pm.collectionVariables.get('allow_live_execution') !== 'true') stop('Live execution is off. Review the quote, then set allow_live_execution=true for one submission.');",
-              "const quoteId=pm.collectionVariables.get('qp_quote_id'), key=pm.collectionVariables.get('qp_operation_key'), max=Number(pm.collectionVariables.get('qp_max_micros')), limit=Number(pm.variables.get('max_micros'));",
-              "if (!/^[a-f0-9-]{36}$/i.test(quoteId||'') || !/^[a-f0-9-]{36}$/i.test(key||'') || !Number.isSafeInteger(max) || max<0 || !Number.isSafeInteger(limit) || max>limit || pm.collectionVariables.get('qp_currency') !== pm.variables.get('currency')) stop('Missing saved operation or changed price limit/currency.');",
-              "pm.variables.set('qp_execute_input',JSON.stringify({quoteId,maxSpendMicros:max}));",
-              "pm.variables.set('qp_execute_key',key);",
-              "pm.collectionVariables.set('allow_live_execution','false');",
-              "pm.collectionVariables.set('qp_state','pending');"
+              "const lookup = JSON.parse(pm.variables.get('request') || '{}');",
+              "if (!lookup || Array.isArray(lookup) || typeof lookup !== 'object' || Object.keys(lookup).some(k=>!['phone','defaultCountry','checks','currency','maxSpend','maxSpendMicros'].includes(k))) stop('Use the common lookup object in request.');",
+              "if (typeof lookup.phone !== 'string' || !lookup.phone.trim() || !Array.isArray(lookup.checks)) stop('Set phone and checks in request.');",
+              "if (lookup.defaultCountry !== undefined && (typeof lookup.defaultCountry !== 'string' || !/^[A-Za-z]{2}$/.test(lookup.defaultCountry))) stop('defaultCountry must be a two-letter country code.');",
+              "if (lookup.currency !== undefined && !['GBP','USD','EUR'].includes(lookup.currency)) stop('currency must be GBP, USD, or EUR.');",
+              "if (lookup.maxSpendMicros !== undefined && (!Number.isSafeInteger(lookup.maxSpendMicros) || lookup.maxSpendMicros < 0 || lookup.maxSpendMicros > 100000000)) stop('Set an integer maxSpendMicros spending limit.');",
+              "const body=JSON.stringify(lookup);",
+              "let key=pm.collectionVariables.get('qp_direct_key');",
+              "if(key && pm.collectionVariables.get('start_new_lookup')==='true'){",
+              " if(!['settled','expired'].includes(pm.collectionVariables.get('qp_direct_state')))stop('Read the original result before starting another lookup.');",
+              " key='';pm.collectionVariables.set('start_new_lookup','false');",
+              "}",
+              "if(key && pm.collectionVariables.get('qp_direct_input')!==body)stop('The request changed. Recover the original lookup before deliberately starting another.');",
+              "if(!key){key=pm.variables.replaceIn('{{$guid}}');pm.collectionVariables.set('qp_direct_key',key);pm.collectionVariables.set('qp_direct_input',body);}",
+              "pm.variables.set('qp_direct_body',body);pm.variables.set('qp_direct_key',key);pm.collectionVariables.set('qp_direct_state','pending');"
             ]
           }
         },
@@ -254,20 +131,25 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "if (pm.response.code === 200) pm.collectionVariables.set('qp_state','settled');",
-              "else throw Error('Retain the original quote/key. Use request 6 to read its status before retrying.');"
+              "if(pm.response.code===200 && pm.response.json().number && Number.isSafeInteger(pm.response.json().billing?.chargedMicros))pm.collectionVariables.set('qp_direct_state','settled');",
+              "else throw Error('Keep the Idempotency-Key and use Read original result. No automatic replacement is made.');"
             ]
           }
         }
       ]
     },
     {
-      "name": "6. Read original status or result (no charge)",
+      "name": "Read original result",
       "request": {
         "method": "GET",
-        "header": [],
-        "url": "https://quietpass.com/v1/phone/results/{{qp_read_id}}?include_details=true",
-        "description": ""
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "{{qp_direct_key}}"
+          }
+        ],
+        "url": "https://quietpass.com/v1/phone/lookup?includeDetails=true",
+        "description": "Read-only recovery using the same Idempotency-Key."
       },
       "event": [
         {
@@ -276,9 +158,7 @@
             "type": "text/javascript",
             "exec": [
               "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
-              "const id=pm.collectionVariables.get('qp_quote_id');",
-              "if (!/^[a-f0-9-]{36}$/i.test(id||'')) stop('No original quote saved.');",
-              "pm.variables.set('qp_read_id',id);"
+              "const key=pm.collectionVariables.get('qp_direct_key');if(!key)stop('No original lookup is saved.');pm.variables.set('qp_direct_key',key);"
             ]
           }
         },
@@ -287,49 +167,288 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "if (pm.response.code !== 200) throw Error('Status read failed. Keep the original operation.');",
-              "const state=pm.response.json().state;",
-              "if (!['not_started','pending','settled','expired'].includes(state)) throw Error('Unknown status; retain the original reference.');",
-              "pm.collectionVariables.set('qp_state',state);"
+              "if(pm.response.code!==200)throw Error('Keep the original request key; no replacement lookup was made.');",
+              "const state=pm.response.json().state;if(!['not_started','pending','settled','expired'].includes(state))throw Error('Unknown lookup state.');pm.collectionVariables.set('qp_direct_state',state);"
             ]
           }
         }
       ]
     },
     {
-      "name": "7. Missing country example (expected rejection)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": "https://quietpass.com/v1/phone/check",
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"phone\": \"07400123456\",\n  \"checks\": [\n    \"basic_line_type\"\n  ]\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "description": ""
-      },
-      "event": [
+      "name": "Optional quote-based examples",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('National input needs a country and is rejected without a charge',()=>{",
-              " pm.expect(pm.response.code).to.eql(400);",
-              " pm.expect(pm.response.json().error.code).to.eql('COUNTRY_REQUIRED');",
-              "});"
-            ]
-          }
+          "name": "1. Global coverage (public)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "https://quietpass.com/v1/coverage",
+            "description": ""
+          },
+          "event": []
+        },
+        {
+          "name": "2. Wallet (read only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://quietpass.com/v1/wallet",
+            "description": ""
+          },
+          "event": []
+        },
+        {
+          "name": "3. Free number formatting",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "https://quietpass.com/v1/phone/check?includeDetails=true",
+            "body": {
+              "mode": "raw",
+              "raw": "{{qp_free_input}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
+                  "const lookup = JSON.parse(pm.variables.get('request') || '{}');",
+                  "if (!lookup || Array.isArray(lookup) || typeof lookup !== 'object' || Object.keys(lookup).some(k=>!['phone','defaultCountry','checks','currency','maxSpend','maxSpendMicros'].includes(k))) stop('Use the common lookup object in request.');",
+                  "if (typeof lookup.phone !== 'string' || !lookup.phone.trim() || !Array.isArray(lookup.checks)) stop('Set phone and checks in request.');",
+                  "if (lookup.defaultCountry !== undefined && (typeof lookup.defaultCountry !== 'string' || !/^[A-Za-z]{2}$/.test(lookup.defaultCountry))) stop('defaultCountry must be a two-letter country code.');",
+                  "if (lookup.currency !== undefined && !['GBP','USD','EUR'].includes(lookup.currency)) stop('currency must be GBP, USD, or EUR.');",
+                  "if (lookup.maxSpendMicros !== undefined && (!Number.isSafeInteger(lookup.maxSpendMicros) || lookup.maxSpendMicros < 0 || lookup.maxSpendMicros > 100000000)) stop('Set an integer maxSpendMicros spending limit.');",
+                  "const body=lookup;",
+                  "pm.variables.set('qp_input',JSON.stringify(body));",
+                  "pm.variables.set('qp_free_input',JSON.stringify({phone:body.phone,...(body.defaultCountry?{defaultCountry:body.defaultCountry}:{}),checks:['basic_line_type']}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Quote selected checks (no charge)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "https://quietpass.com/v1/phone/quote",
+            "body": {
+              "mode": "raw",
+              "raw": "{{qp_input}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Review quote.maxSpend, currency, and unavailableChecks. The quoted maxSpend is an amount in that currency, such as 0.05."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
+                  "if (pm.collectionVariables.get('qp_quote_id')) {",
+                  "  if (pm.collectionVariables.get('start_new_lookup') !== 'true' || !['settled','expired'].includes(pm.collectionVariables.get('qp_state'))) stop('Read the original result. Only a settled or expired operation can be replaced with start_new_lookup=true.');",
+                  "  for (const key of ['qp_quote_id','qp_operation_key','qp_max_micros','qp_currency','qp_state']) pm.collectionVariables.unset(key);",
+                  "  pm.collectionVariables.set('start_new_lookup','false');",
+                  "}",
+                  "const lookup = JSON.parse(pm.variables.get('request') || '{}');",
+                  "if (!lookup || Array.isArray(lookup) || typeof lookup !== 'object' || Object.keys(lookup).some(k=>!['phone','defaultCountry','checks','currency','maxSpend','maxSpendMicros'].includes(k))) stop('Use the common lookup object in request.');",
+                  "if (typeof lookup.phone !== 'string' || !lookup.phone.trim() || !Array.isArray(lookup.checks)) stop('Set phone and checks in request.');",
+                  "if (lookup.defaultCountry !== undefined && (typeof lookup.defaultCountry !== 'string' || !/^[A-Za-z]{2}$/.test(lookup.defaultCountry))) stop('defaultCountry must be a two-letter country code.');",
+                  "if (lookup.currency !== undefined && !['GBP','USD','EUR'].includes(lookup.currency)) stop('currency must be GBP, USD, or EUR.');",
+                  "if (lookup.maxSpendMicros !== undefined && (!Number.isSafeInteger(lookup.maxSpendMicros) || lookup.maxSpendMicros < 0 || lookup.maxSpendMicros > 100000000)) stop('Set an integer maxSpendMicros spending limit.');",
+                  "const body=lookup;",
+                  "pm.variables.set('qp_input',JSON.stringify(body));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 200) throw Error(pm.response.json().error?.code || 'Quote failed');",
+                  "const q = pm.response.json().quote;",
+                  "const lookup=JSON.parse(pm.variables.get('request')||'{}');",
+                  "let limit=lookup.maxSpendMicros??100000000;",
+                  "if(lookup.maxSpend!==undefined){",
+                  " const text=String(lookup.maxSpend);if(!/^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,6})?$/.test(text))stop('Use a maxSpend amount such as 0.05.');",
+                  " const [whole,fraction='']=text.split('.'),value=BigInt(whole)*1000000n+BigInt(fraction.padEnd(6,'0'));",
+                  " if(value>100000000n)stop('maxSpend exceeds the per-lookup limit.');",
+                  " limit=Number(value);if(lookup.maxSpendMicros!==undefined&&lookup.maxSpendMicros!==limit)stop('Conflicting spending limits.');",
+                  "}",
+                  "if (!q || !/^[a-f0-9-]{36}$/i.test(q.id) || !Number.isSafeInteger(limit) || limit < 0 || !Number.isSafeInteger(q.maxMicros) || q.maxMicros < 0 || q.maxMicros > limit || lookup.currency!==undefined&&q.currency!==lookup.currency || !Number.isFinite(Date.parse(q.expiresAt)) || Date.parse(q.expiresAt) <= Date.now()) throw Error('Review the quoted currency, price, or expiry. No execution enabled.');",
+                  "pm.collectionVariables.set('qp_quote_id',q.id);",
+                  "pm.collectionVariables.set('qp_operation_key',pm.variables.replaceIn('{{$guid}}'));",
+                  "pm.collectionVariables.set('qp_max_micros',String(q.maxMicros));",
+                  "pm.collectionVariables.set('qp_currency',q.currency);",
+                  "pm.collectionVariables.set('qp_state','not_started');",
+                  "pm.collectionVariables.set('allow_live_execution','false');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Execute original quote (explicit opt-in)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{qp_execute_key}}"
+              }
+            ],
+            "url": "https://quietpass.com/v1/phone/execute?includeDetails=true",
+            "body": {
+              "mode": "raw",
+              "raw": "{{qp_execute_input}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Use the same quote, maximum, and key for recovery. No automatic retries."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
+                  "if (pm.collectionVariables.get('allow_live_execution') !== 'true') stop('Live execution is off. Review the quote, then set allow_live_execution=true for one submission.');",
+                  "const lookup=JSON.parse(pm.variables.get('request')||'{}');",
+                  "let limit=lookup.maxSpendMicros??100000000;",
+                  "if(lookup.maxSpend!==undefined){",
+                  " const text=String(lookup.maxSpend);if(!/^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,6})?$/.test(text))stop('Use a maxSpend amount such as 0.05.');",
+                  " const [whole,fraction='']=text.split('.'),value=BigInt(whole)*1000000n+BigInt(fraction.padEnd(6,'0'));",
+                  " if(value>100000000n)stop('maxSpend exceeds the per-lookup limit.');",
+                  " limit=Number(value);if(lookup.maxSpendMicros!==undefined&&lookup.maxSpendMicros!==limit)stop('Conflicting spending limits.');",
+                  "}",
+                  "const quoteId=pm.collectionVariables.get('qp_quote_id'), key=pm.collectionVariables.get('qp_operation_key'), max=Number(pm.collectionVariables.get('qp_max_micros'));",
+                  "if (!/^[a-f0-9-]{36}$/i.test(quoteId||'') || !/^[a-f0-9-]{36}$/i.test(key||'') || !Number.isSafeInteger(max) || max<0 || !Number.isSafeInteger(limit) || max>limit || lookup.currency!==undefined&&pm.collectionVariables.get('qp_currency')!==lookup.currency) stop('Missing saved operation or changed price limit/currency.');",
+                  "pm.variables.set('qp_execute_input',JSON.stringify({quoteId,maxSpend:(max/1000000).toFixed(6).replace(/0+$/,'').replace(/\\.$/,'.00')}));",
+                  "pm.variables.set('qp_execute_key',key);",
+                  "pm.collectionVariables.set('allow_live_execution','false');",
+                  "pm.collectionVariables.set('qp_state','pending');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set('qp_state','settled');",
+                  "else throw Error('Retain the original quote/key. Use request 6 to read its status before retrying.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Read original status or result (no charge)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "https://quietpass.com/v1/phone/results/{{qp_read_id}}?includeDetails=true",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function stop(message) { pm.execution.skipRequest(); throw Error(message); }",
+                  "const id=pm.collectionVariables.get('qp_quote_id');",
+                  "if (!/^[a-f0-9-]{36}$/i.test(id||'')) stop('No original quote saved.');",
+                  "pm.variables.set('qp_read_id',id);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 200) throw Error('Status read failed. Keep the original operation.');",
+                  "const state=pm.response.json().state;",
+                  "if (!['not_started','pending','settled','expired'].includes(state)) throw Error('Unknown status; retain the original reference.');",
+                  "pm.collectionVariables.set('qp_state',state);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Missing country example (expected rejection)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "https://quietpass.com/v1/phone/check",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"07400123456\",\n  \"checks\": [\n    \"basic_line_type\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('National input needs a country and is rejected without a charge',()=>{",
+                  " pm.expect(pm.response.code).to.eql(400);",
+                  " pm.expect(pm.response.json().error.code).to.eql('COUNTRY_REQUIRED');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     }
