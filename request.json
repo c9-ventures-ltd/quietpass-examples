@@ -1,0 +1,7 @@
+{
+  "phone": "",
+  "defaultCountry": "GB",
+  "checks": ["basic_line_type"],
+  "currency": "GBP",
+  "maxSpend": "0.00"
+}
