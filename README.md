@@ -2,7 +2,7 @@
 
 Send a phone number and choose the information you need: free number details, current network and live status, or linked messaging accounts. Use the answers in your forms, CRM, or automation workflows.
 
-[API quickstart](https://quietpass.com/docs/) · [API reference](https://quietpass.com/docs/api/) · [Integrations](https://quietpass.com/integrations/) · [Pricing](https://quietpass.com/pricing/) · [Coverage](https://quietpass.com/coverage/)
+[API quickstart](https://quietpass.com/docs/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [API reference](https://quietpass.com/docs/api/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [Integrations](https://quietpass.com/integrations/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [Pricing](https://quietpass.com/pricing/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [Coverage](https://quietpass.com/coverage/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
 
 ## Choose a starter
 
@@ -17,7 +17,7 @@ JavaScript, Python, and Postman use the same [request JSON](request.json). The n
 
 ## Make your first lookup
 
-Create a [QuietPass account](https://quietpass.com/signup.html) and an API key. Set `QUIETPASS_API_KEY` in your server environment.
+Create a [QuietPass account](https://quietpass.com/signup.html?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) and an API key. Set `QUIETPASS_API_KEY` in your server environment.
 
 In [request.json](request.json), set `phone` to the number you want to check. Use `defaultCountry` for a local number; international numbers beginning with `+` or `00` do not need it. For example, `07400 123456` with `defaultCountry: "GB"` is accepted.
 
@@ -43,7 +43,7 @@ node javascript/quietpass.mjs request.json
 python3 python/quietpass.py request.json
 ```
 
-For Postman, import the collection, add your key to Vault as `quietpass-api-key`, set the collection's `request` variable to your request JSON, and send **Run lookup**.
+For Postman, [open the public collection](https://www.postman.com/c9ventures-2507049/quietpass-api/collection/60120118-7078b738-2c5b-494e-8faf-792fd7d22f24) or import the download, add your key to Vault as `quietpass-api-key`, set the collection's `request` variable to your request JSON, and send **Run lookup**.
 
 ## Add the checks you need
 
@@ -55,7 +55,7 @@ Select individual checks within either paid package, or combine both in the same
 | Phone services | `enhanced_line_type`, `current_carrier`, `mnp`, `live_status`, `sms` | 0.02 |
 | Messaging apps | `whatsapp`, `telegram` | 0.03 |
 
-Prices above are in your workspace currency: GBP, USD, or EUR. Each selected paid package is charged once when at least one requested check gives a definite answer, including a negative. A package with only unavailable or inconclusive answers costs zero. [Billing details](https://quietpass.com/pricing/#charging).
+Prices above are in your workspace currency: GBP, USD, or EUR. Each selected paid package is charged once when at least one requested check gives a definite answer, including a negative. A package with only unavailable or inconclusive answers costs zero. [Billing details](https://quietpass.com/pricing/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples#charging).
 
 For example, change `checks` to `["current_carrier", "whatsapp"]` and `maxSpend` to `"0.05"` to allow both packages. Use your workspace's currency in `currency`. The lookup returns the actual charge in `billing.amount` and `billing.currency`.
 
@@ -71,17 +71,17 @@ Saved results are available for 24 hours. Keep the original request and operatio
 
 ## Connect a platform
 
-- [HubSpot setup](https://quietpass.com/integrations/hubspot/)
-- [n8n verified node and HubSpot workflows](https://quietpass.com/integrations/n8n/)
-- [Make setup and workflow downloads](https://quietpass.com/integrations/make/)
-- [Zapier setup](https://quietpass.com/integrations/zapier/)
-- [Clay setup](https://quietpass.com/integrations/clay/)
-- [HighLevel setup](https://quietpass.com/integrations/highlevel/)
+- [HubSpot setup](https://quietpass.com/integrations/hubspot/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
+- [n8n verified node and HubSpot workflows](https://quietpass.com/integrations/n8n/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
+- [Make setup and workflow downloads](https://quietpass.com/integrations/make/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
+- [Zapier setup](https://quietpass.com/integrations/zapier/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
+- [Clay setup](https://quietpass.com/integrations/clay/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
+- [HighLevel setup](https://quietpass.com/integrations/highlevel/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
 
 The n8n HTTP starter in this repository uses built-in nodes. The HubSpot workflows use the separate [verified QuietPass node](https://github.com/c9-ventures-ltd/n8n-nodes-quietpass).
 
 ## Help
 
-[Contact QuietPass](https://quietpass.com/contact/) with the request reference and error code if you need help. Keep API keys and customer data out of public issues and shared exports.
+[Contact QuietPass](https://quietpass.com/contact/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) with the request reference and error code if you need help. Keep API keys and customer data out of public issues and shared exports.
 
-These files match the starters published on quietpass.com. [Service terms](https://quietpass.com/terms/) apply to use of the API.
+These files match the starters published on quietpass.com. [Service terms](https://quietpass.com/terms/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) apply to use of the API.
