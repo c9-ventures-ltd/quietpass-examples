@@ -1,6 +1,6 @@
 # QuietPass API examples
 
-Send a phone number and choose the information you need: free number details, current network and live status, or linked messaging accounts. Use the answers in your forms, CRM, or automation workflows.
+[QuietPass](https://quietpass.com/) lets you send a phone number and choose the information you need: free number details, current network and live status, or linked messaging accounts. Use the answers in your forms, CRM, or automation workflows.
 
 [API quickstart](https://quietpass.com/docs/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [API reference](https://quietpass.com/docs/api/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [Integrations](https://quietpass.com/integrations/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [Pricing](https://quietpass.com/pricing/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples) · [Coverage](https://quietpass.com/coverage/?utm_source=github&utm_medium=referral&utm_campaign=integrations&utm_content=examples)
 
